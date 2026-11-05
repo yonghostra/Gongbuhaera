@@ -1,0 +1,50 @@
+name: gongbuhaera
+description: "공부해라 — 엄마·아빠 목소리의 가상 부모가 공부를 지켜봐 주는 앱"
+publish_to: 'none'
+version: 0.1.0+1
+
+environment:
+  sdk: ^3.5.0
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  cupertino_icons: ^1.0.8
+  # 카메라 + 얼굴 인식 (폰 안에서만 처리, 영상은 밖으로 나가지 않음)
+  camera: ^0.11.0
+  google_mlkit_face_detection: ^0.13.1
+  # 부모 목소리 녹음 / 재생
+  record: ^7.1.1
+  audioplayers: ^6.1.0
+  # 부모 사진
+  image_picker: ^1.1.2
+  # 저장 / 네트워크
+  shared_preferences: ^2.3.2
+  path_provider: ^2.1.4
+  http: ^1.2.2
+  http_parser: ^4.0.2
+  # 공부 중 화면 꺼짐 방지
+  wakelock_plus: ^1.2.8
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
+
+  fonts:
+    - family: Pretendard
+      fonts:
+        - asset: assets/fonts/Pretendard-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/Pretendard-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/Pretendard-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/Pretendard-Bold.ttf
+          weight: 700
+        - asset: assets/fonts/Pretendard-ExtraBold.ttf
+          weight: 800
