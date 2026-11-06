@@ -41,7 +41,6 @@ class _HistoryScreenState extends State<HistoryScreen> {
             .fold<int>(0, (s, r) => s + r.studiedSeconds);
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: AppColors.bg,
         title: Text('공부 기록', style: AppText.base(20, w: FontWeight.w800)),
       ),
       body: records == null
@@ -55,10 +54,14 @@ class _HistoryScreenState extends State<HistoryScreen> {
                   padding: const EdgeInsets.all(20),
                   children: [
                     Container(
-                      padding: const EdgeInsets.all(18),
+                      padding: const EdgeInsets.all(20),
                       decoration: BoxDecoration(
-                          color: AppColors.surface,
-                          borderRadius: BorderRadius.circular(16)),
+                          color: AppColors.sienna.withValues(alpha: 0.18),
+                          border: Border.all(
+                              color: AppColors.siennaLight
+                                  .withValues(alpha: 0.5),
+                              width: 1.5),
+                          borderRadius: BorderRadius.circular(24)),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -67,7 +70,8 @@ class _HistoryScreenState extends State<HistoryScreen> {
                           const SizedBox(height: 4),
                           Text(
                               '${weekSec ~/ 3600}시간 ${(weekSec % 3600) ~/ 60}분',
-                              style: AppText.base(30, w: FontWeight.w800)),
+                              style: AppText.number(36,
+                                  c: AppColors.siennaLight)),
                         ],
                       ),
                     ),
@@ -78,7 +82,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                         padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
                             color: AppColors.surface,
-                            borderRadius: BorderRadius.circular(14)),
+                            borderRadius: BorderRadius.circular(18)),
                         child: Row(
                           children: [
                             Icon(
@@ -86,8 +90,8 @@ class _HistoryScreenState extends State<HistoryScreen> {
                                     ? Icons.check_circle
                                     : Icons.timelapse,
                                 color: r.completed
-                                    ? AppColors.focused
-                                    : AppColors.inkSub),
+                                    ? AppColors.siennaLight
+                                    : AppColors.inkFaint),
                             const SizedBox(width: 14),
                             Expanded(
                               child: Column(

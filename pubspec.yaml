@@ -1,10 +1,10 @@
 name: gongbuhaera
 description: "공부해라 — 엄마·아빠 목소리의 가상 부모가 공부를 지켜봐 주는 앱"
 publish_to: 'none'
-version: 0.1.0+1
+version: 0.2.0+2
 
 environment:
-  sdk: ^3.5.0
+  sdk: ^3.8.0
 
 dependencies:
   flutter:
@@ -24,6 +24,8 @@ dependencies:
   path_provider: ^2.1.4
   http: ^1.2.2
   http_parser: ^4.0.2
+  # 말하는 아바타 영상 재생
+  video_player: ^2.9.2
   # 공부 중 화면 꺼짐 방지
   wakelock_plus: ^1.2.8
 

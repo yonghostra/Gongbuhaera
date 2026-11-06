@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 
 import '../models/parent_profile.dart';
-import '../models/study_record.dart';
+import '../services/avatar_library.dart';
 import '../services/storage_service.dart';
 import '../theme.dart';
-import '../widgets/parent_avatar.dart';
+import '../widgets/avatar_view.dart';
+import '../widgets/ui.dart';
 import 'history_screen.dart';
 import 'setup_screen.dart';
 import 'study_screen.dart';
@@ -21,122 +22,117 @@ class _HomeScreenState extends State<HomeScreen> {
   static const _presets = [10, 25, 50, 90];
   int _minutes = 25;
   int _todaySeconds = 0;
+  AvatarController? _avatar;
 
   @override
   void initState() {
     super.initState();
     _loadToday();
+    _startIdle();
+  }
+
+  @override
+  void dispose() {
+    _avatar?.dispose();
+    super.dispose();
+  }
+
+  Future<void> _startIdle() async {
+    final c = AvatarController();
+    setState(() => _avatar = c);
+    await c.init(await AvatarLibrary(widget.profile.voiceId).idleVideo());
   }
 
   Future<void> _loadToday() async {
     final records = await StorageService.loadRecords();
     final now = DateTime.now();
-    final today = records.where((r) =>
-        r.startedAt.year == now.year &&
-        r.startedAt.month == now.month &&
-        r.startedAt.day == now.day);
-    if (!mounted) return;
-    setState(() => _todaySeconds =
-        today.fold(0, (sum, r) => sum + r.studiedSeconds));
+    final sec = records
+        .where((r) =>
+            r.startedAt.year == now.year &&
+            r.startedAt.month == now.month &&
+            r.startedAt.day == now.day)
+        .fold<int>(0, (s, r) => s + r.studiedSeconds);
+    if (mounted) setState(() => _todaySeconds = sec);
   }
 
   Future<void> _start() async {
-    await Navigator.of(context).push<StudyRecord>(MaterialPageRoute(
-      builder: (_) =>
-          StudyScreen(profile: widget.profile, minutes: _minutes),
+    await _avatar?.pauseAll();
+    if (!mounted) return;
+    await Navigator.of(context).push(MaterialPageRoute(
+      builder: (_) => StudyScreen(profile: widget.profile, minutes: _minutes),
     ));
+    await _avatar?.resumeIdle();
     _loadToday();
+  }
+
+  String get _todayLabel {
+    final m = _todaySeconds ~/ 60;
+    return m >= 60 ? '오늘 ${m ~/ 60}시간 ${m % 60}분' : '오늘 $m분';
   }
 
   @override
   Widget build(BuildContext context) {
     final p = widget.profile;
-    final todayMin = _todaySeconds ~/ 60;
     return Scaffold(
-      appBar: AppBar(
-        backgroundColor: AppColors.bg,
-        title: Text('공부해라', style: AppText.base(22, w: FontWeight.w800)),
-        actions: [
-          IconButton(
-            tooltip: '공부 기록',
-            icon: const Icon(Icons.bar_chart_rounded),
-            onPressed: () => Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const HistoryScreen())),
-          ),
-          IconButton(
-            tooltip: '부모 다시 설정',
-            icon: const Icon(Icons.settings_outlined),
-            onPressed: () => Navigator.of(context).push(MaterialPageRoute(
-                builder: (_) => SetupScreen(previous: p))),
-          ),
-        ],
-      ),
       body: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(24, 12, 24, 24),
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
           child: Column(
             children: [
-              const Spacer(),
-              ParentAvatar(photoPath: p.photoPath, size: 180),
-              const SizedBox(height: 20),
-              Text('${p.childCall}, 공부할 시간이야!',
-                  textAlign: TextAlign.center,
-                  style: AppText.base(24, w: FontWeight.w800)),
-              const SizedBox(height: 8),
-              Text('오늘 공부한 시간  ${todayMin ~/ 60 > 0 ? '${todayMin ~/ 60}시간 ' : ''}${todayMin % 60}분',
-                  style: AppText.base(16, c: AppColors.inkSub)),
-              const Spacer(),
-              Text('얼마나 할까?', style: AppText.base(17, w: FontWeight.w700)),
-              const SizedBox(height: 12),
               Row(
                 children: [
-                  for (final m in _presets)
-                    Expanded(
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 4),
-                        child: ChoiceChip(
-                          label: SizedBox(
-                            width: double.infinity,
-                            child: Text('$m분',
-                                textAlign: TextAlign.center,
-                                style: AppText.base(17,
-                                    w: FontWeight.w700,
-                                    c: _minutes == m
-                                        ? Colors.black
-                                        : AppColors.ink)),
-                          ),
-                          selected: _minutes == m,
-                          showCheckmark: false,
-                          selectedColor: AppColors.accent,
-                          backgroundColor: AppColors.surface,
-                          onSelected: (_) => setState(() => _minutes = m),
-                        ),
-                      ),
-                    ),
+                  Text('공부해라',
+                      style: AppText.base(26,
+                          w: FontWeight.w800, c: AppColors.siennaLight)),
+                  const Spacer(),
+                  StatusChip(label: _todayLabel, color: AppColors.siennaLight),
+                  const SizedBox(width: 8),
+                  RoundIconButton(
+                    icon: Icons.settings_outlined,
+                    tooltip: '가상 부모 다시 만들기',
+                    size: 40,
+                    onPressed: () => Navigator.of(context).push(
+                        MaterialPageRoute(
+                            builder: (_) => SetupScreen(previous: p))),
+                  ),
                 ],
               ),
-              const SizedBox(height: 24),
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                    color: AppColors.surface,
-                    borderRadius: BorderRadius.circular(12)),
-                child: Row(
+              Expanded(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Icon(Icons.info_outline,
-                        size: 20, color: AppColors.inkSub),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                          '폰을 세워서 얼굴이 보이게 두세요. 카메라 영상은 폰 밖으로 나가지 않아요.',
-                          style: AppText.base(13,
-                              c: AppColors.inkSub, height: 1.4)),
-                    ),
+                    AvatarView(
+                        controller: _avatar,
+                        photoPath: p.photoPath,
+                        width: 250,
+                        height: 290),
+                    const SizedBox(height: 22),
+                    Text('${p.childCall}, 공부할 시간이야!',
+                        textAlign: TextAlign.center,
+                        style: AppText.base(22, w: FontWeight.w800)),
+                    const SizedBox(height: 8),
+                    Text('폰을 세워 얼굴이 보이게 두세요 · 영상은 폰 밖으로 나가지 않아요',
+                        textAlign: TextAlign.center,
+                        style: AppText.base(13,
+                            c: AppColors.inkSub, height: 1.5)),
                   ],
                 ),
               ),
+              PillTabs<int>(
+                values: _presets,
+                selected: _minutes,
+                labelOf: (m) => '$m분',
+                onChanged: (m) => setState(() => _minutes = m),
+              ),
               const SizedBox(height: 16),
-              BigButton(label: '공부 시작', onPressed: _start),
+              PillButton(label: '공부 시작', onPressed: _start),
+              const SizedBox(height: 16),
+              RoundIconButton(
+                icon: Icons.bar_chart_rounded,
+                tooltip: '공부 기록',
+                onPressed: () => Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const HistoryScreen())),
+              ),
             ],
           ),
         ),

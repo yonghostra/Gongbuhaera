@@ -1,14 +1,10 @@
 import 'dart:convert';
-import 'dart:io';
-import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart';
-import 'package:path_provider/path_provider.dart';
 
 import '../config.dart';
-import '../data/lines.dart';
 
 class VoiceException implements Exception {
   final String message;
@@ -84,89 +80,5 @@ class VoiceService {
     } catch (_) {
       return '음성 서버 오류 (${r.statusCode})';
     }
-  }
-}
-
-/// 기기에 저장된 부모 멘트 음성 파일 관리.
-///
-/// 파일 위치: <앱 문서 폴더>/voice/<voiceId>/<kind>_<번호>.mp3
-/// voiceId 별로 폴더를 나눠, 다시 설정해도 예전 파일과 섞이지 않는다.
-class LineLibrary {
-  final String voiceId;
-  LineLibrary(this.voiceId);
-
-  final _rand = Random();
-  final Map<LineKind, int> _lastIndex = {};
-
-  static Future<Directory> _dir(String voiceId) async {
-    final docs = await getApplicationDocumentsDirectory();
-    return Directory('${docs.path}/voice/$voiceId');
-  }
-
-  /// 30개 멘트를 모두 만들어 저장. [onProgress] 로 (완료 개수, 전체) 알림.
-  static Future<void> generateAll({
-    required VoiceService service,
-    required String voiceId,
-    required String childCall,
-    required String role,
-    required void Function(int done, int total) onProgress,
-  }) async {
-    final dir = await _dir(voiceId);
-    await dir.create(recursive: true);
-    final total = totalLineCount;
-    var done = 0;
-    for (final entry in lineTemplates.entries) {
-      for (var i = 0; i < entry.value.length; i++) {
-        final file = File('${dir.path}/${entry.key.name}_$i.mp3');
-        if (!await file.exists()) {
-          final text =
-              fillLine(entry.value[i], childCall: childCall, role: role);
-          final bytes = await _withRetry(() => service.tts(voiceId, text));
-          await file.writeAsBytes(bytes, flush: true);
-        }
-        done++;
-        onProgress(done, total);
-      }
-    }
-  }
-
-  static Future<T> _withRetry<T>(Future<T> Function() f) async {
-    for (var attempt = 0;; attempt++) {
-      try {
-        return await f();
-      } catch (e) {
-        if (attempt >= 2) rethrow;
-        await Future.delayed(Duration(seconds: 2 * (attempt + 1)));
-      }
-    }
-  }
-
-  /// 모든 멘트 파일이 다 있는지.
-  static Future<bool> isComplete(String voiceId) async {
-    final dir = await _dir(voiceId);
-    for (final entry in lineTemplates.entries) {
-      for (var i = 0; i < entry.value.length; i++) {
-        if (!await File('${dir.path}/${entry.key.name}_$i.mp3').exists()) {
-          return false;
-        }
-      }
-    }
-    return true;
-  }
-
-  /// 예전 목소리 파일 정리.
-  static Future<void> deleteFiles(String voiceId) async {
-    final dir = await _dir(voiceId);
-    if (await dir.exists()) await dir.delete(recursive: true);
-  }
-
-  /// 종류별로 랜덤 멘트 파일 경로 (직전과 같은 멘트는 피함).
-  Future<String> pick(LineKind kind) async {
-    final n = lineTemplates[kind]!.length;
-    var i = _rand.nextInt(n);
-    if (n > 1 && i == _lastIndex[kind]) i = (i + 1) % n;
-    _lastIndex[kind] = i;
-    final dir = await _dir(voiceId);
-    return '${dir.path}/${kind.name}_$i.mp3';
   }
 }

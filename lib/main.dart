@@ -6,7 +6,7 @@ import 'screens/home_screen.dart';
 import 'screens/setup_screen.dart';
 import 'services/audio_service.dart';
 import 'services/storage_service.dart';
-import 'services/voice_service.dart';
+import 'services/avatar_library.dart';
 import 'theme.dart';
 
 Future<void> main() async {
@@ -15,17 +15,17 @@ Future<void> main() async {
   await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
   await AudioService.configureSession();
 
-  // 부모 설정이 끝까지 된 경우에만 홈으로, 아니면 설정부터.
-  ParentProfile? profile = await StorageService.loadProfile();
-  if (profile != null && !await LineLibrary.isComplete(profile.voiceId)) {
-    profile = null;
-  }
-  runApp(GongbuApp(profile: profile));
+  // 아바타가 끝까지 만들어진 경우에만 홈으로, 아니면 설정부터.
+  // (만들다 중단된 경우 설정 화면이 이어서 진행한다)
+  final saved = await StorageService.loadProfile();
+  final ready = saved != null && await AvatarLibrary.isComplete(saved.voiceId);
+  runApp(GongbuApp(profile: ready ? saved : null, resume: ready ? null : saved));
 }
 
 class GongbuApp extends StatelessWidget {
   final ParentProfile? profile;
-  const GongbuApp({super.key, this.profile});
+  final ParentProfile? resume;
+  const GongbuApp({super.key, this.profile, this.resume});
 
   @override
   Widget build(BuildContext context) {
@@ -43,7 +43,7 @@ class GongbuApp extends StatelessWidget {
         );
       },
       home: profile == null
-          ? const SetupScreen()
+          ? SetupScreen(resume: resume)
           : HomeScreen(profile: profile!),
     );
   }
