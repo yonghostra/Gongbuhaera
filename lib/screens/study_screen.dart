@@ -15,11 +15,11 @@ import '../theme.dart';
 import '../widgets/avatar_view.dart';
 import '../widgets/ui.dart';
 
-/// 공부 화면: 타이머 + 카메라 감시 + 말하는 가상 부모.
+/// 공부 화면: 타이머 + 카메라 감시 + 말하는 가상 부모 (사진 + 복제 목소리).
 ///
 /// 규칙
 ///  · 자리에 있을 때만 시간이 줄어든다 (자리 비우면 멈춤).
-///  · 졸음/자리 비움/딴짓을 감지하면 가상 부모가 영상으로 지적, 집중하면 가끔 칭찬.
+///  · 졸음/자리 비움/딴짓을 감지하면 가상 부모가 부모 목소리로 지적, 집중하면 가끔 칭찬.
 ///  · 공부 중 다른 앱으로 나가면 시간이 멈추고, 돌아오면 한마디 듣는다.
 class StudyScreen extends StatefulWidget {
   final ParentProfile profile;
@@ -126,7 +126,7 @@ class _StudyScreenState extends State<StudyScreen> with WidgetsBindingObserver {
     try {
       final clip = await _lib.pick(kind,
           childCall: widget.profile.childCall, role: widget.profile.role);
-      await _avatar.say(clip.video, clip.text);
+      await _avatar.say(video: clip.video, audio: clip.audio, text: clip.text);
     } catch (_) {}
   }
 

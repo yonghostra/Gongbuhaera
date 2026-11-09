@@ -5,7 +5,9 @@ import 'dart:math';
 
 import 'package:path_provider/path_provider.dart';
 
+import '../config.dart';
 import '../data/lines.dart';
+import 'audio_utils.dart';
 import 'avatar_service.dart';
 import 'voice_service.dart';
 
@@ -30,7 +32,8 @@ class AvatarClip {
 /// 기기에 저장된 가상 부모 파일 관리 + 생성 파이프라인.
 ///
 /// 위치: <앱 문서 폴더>/avatar/<voiceId>/
-///   <kind>_<n>.mp3  부모 목소리 (ElevenLabs)
+///   <kind>_<n>.wav  부모 목소리 (ElevenLabs PCM → WAV)
+///   ── 아래는 HeyGen 을 켰을 때만 (Config.useVideoAvatar) ──
 ///   <kind>_<n>.mp4  말하는 아바타 영상 (HeyGen, 소리 포함)
 ///   idle.mp4        말없이 끄덕이는 대기 영상 (반복 재생)
 ///   jobs.json       진행 중인 HeyGen 작업 (앱을 껐다 켜도 이어서 진행)
@@ -62,12 +65,12 @@ class AvatarLibrary {
     final clips = AvatarClip.lines;
     var done = 0;
     for (final c in clips) {
-      final f = await _file(voiceId, c, 'mp3');
+      final f = await _file(voiceId, c, 'wav');
       if (!await f.exists()) {
         final text = fillLine(lineTemplates[c.kind]![c.index],
             childCall: childCall, role: role);
-        final bytes = await _retry(() => service.tts(voiceId, text));
-        await f.writeAsBytes(bytes, flush: true);
+        final pcm = await _retry(() => service.tts(voiceId, text));
+        await f.writeAsBytes(pcmToWav(pcm), flush: true);
       }
       onProgress(++done, clips.length);
     }
@@ -106,7 +109,7 @@ class AvatarLibrary {
       for (final c in pending) {
         if (slots <= 0) break;
         if (jobs.containsKey(c.name)) continue;
-        final audio = c.kind == null ? null : (await _file(voiceId, c, 'mp3')).path;
+        final audio = c.kind == null ? null : (await _file(voiceId, c, 'wav')).path;
         jobs[c.name] = await _retry(() => service.createVideo(
             talkingPhotoId: talkingPhotoId, audioPath: audio));
         await saveJobs();
@@ -154,10 +157,15 @@ class AvatarLibrary {
 
   // ───────── 상태 ─────────
 
-  /// 아바타 영상이 전부 준비됐는지.
+  /// 가상 부모가 다 준비됐는지. (목소리 30개 + HeyGen 을 켰다면 영상 31개)
   static Future<bool> isComplete(String voiceId) async {
-    for (final c in AvatarClip.all) {
-      if (!await (await _file(voiceId, c, 'mp4')).exists()) return false;
+    for (final c in AvatarClip.lines) {
+      if (!await (await _file(voiceId, c, 'wav')).exists()) return false;
+    }
+    if (Config.useVideoAvatar) {
+      for (final c in AvatarClip.all) {
+        if (!await (await _file(voiceId, c, 'mp4')).exists()) return false;
+      }
     }
     return true;
   }
@@ -174,8 +182,9 @@ class AvatarLibrary {
 
   Future<String> idleVideo() async => (await _file(voiceId, AvatarClip.idle, 'mp4')).path;
 
-  /// 종류별로 랜덤 클립 (직전과 같은 것은 피함). 영상 경로와 자막 문장.
-  Future<({String video, String text})> pick(LineKind kind,
+  /// 종류별로 랜덤 클립 (직전과 같은 것은 피함).
+  /// 영상 경로(HeyGen 을 껐으면 없는 파일), 음성 경로, 자막 문장.
+  Future<({String video, String audio, String text})> pick(LineKind kind,
       {required String childCall, required String role}) async {
     final n = lineTemplates[kind]!.length;
     var i = _rand.nextInt(n);
@@ -184,6 +193,7 @@ class AvatarLibrary {
     final clip = AvatarClip(kind, i);
     return (
       video: (await _file(voiceId, clip, 'mp4')).path,
+      audio: (await _file(voiceId, clip, 'wav')).path,
       text: fillLine(lineTemplates[kind]![i], childCall: childCall, role: role),
     );
   }

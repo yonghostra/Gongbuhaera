@@ -16,8 +16,13 @@ const HG_API = "https://api.heygen.com";
 const TTS_MODEL = "eleven_multilingual_v2";
 // 남용 방지: 멘트 한 줄 최대 길이, 녹음 파일 최대 크기
 const MAX_TEXT = 200;
+// 앱이 고를 수 있는 음성 형식 (PCM: 16bit 모노 원음)
+const TTS_FORMATS: Record<string, { name: string; mime: string }> = {
+  "pcm_24000": { name: "pcm_24000", mime: "audio/pcm" },
+  "mp3_44100_128": { name: "mp3_44100_128", mime: "audio/mpeg" },
+};
 const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
-const MAX_AUDIO_BYTES = 2 * 1024 * 1024; // 멘트 한 줄 mp3 는 100KB 안팎
+const MAX_AUDIO_BYTES = 2 * 1024 * 1024; // 멘트 한 줄 wav 는 200KB 안팎
 // 아바타 영상: 정사각형, 앱 화면의 아바타 프레임 배경색과 같은 배경
 const AVATAR_DIMENSION = { width: 720, height: 720 };
 const AVATAR_BACKGROUND = "#1D1A18";
@@ -85,21 +90,24 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    // 문장 → 복제 목소리 mp3
-    // 앱 → JSON { voice_id, text }
+    // 문장 → 복제 목소리
+    // 앱 → JSON { voice_id, text, format? }
+    //   format: "pcm_24000"(기본, 앱이 WAV 로 감싸고 소리 크기를 계산) 또는 "mp3_44100_128"
     if (path.startsWith("/tts")) {
-      const { voice_id, text } = await req.json();
+      const { voice_id, text, format } = await req.json();
       if (typeof voice_id !== "string" || !VOICE_ID.test(voice_id)) {
         return json({ error: "bad voice_id" }, 400);
       }
       if (typeof text !== "string" || !text.trim() || text.length > MAX_TEXT) {
         return json({ error: "bad text" }, 400);
       }
+      const outFormat = TTS_FORMATS[String(format ?? "pcm_24000")];
+      if (!outFormat) return json({ error: "bad format" }, 400);
       const r = await fetch(
-        `${API}/text-to-speech/${voice_id}?output_format=mp3_44100_128`,
+        `${API}/text-to-speech/${voice_id}?output_format=${outFormat.name}`,
         {
           method: "POST",
-          headers: { "xi-api-key": KEY, "Content-Type": "application/json", Accept: "audio/mpeg" },
+          headers: { "xi-api-key": KEY, "Content-Type": "application/json", Accept: outFormat.mime },
           body: JSON.stringify({
             text,
             model_id: TTS_MODEL,
@@ -115,7 +123,7 @@ Deno.serve(async (req: Request) => {
       }
       return new Response(r.body, {
         status: 200,
-        headers: { ...CORS, "Content-Type": "audio/mpeg" },
+        headers: { ...CORS, "Content-Type": outFormat.mime },
       });
     }
 
@@ -152,7 +160,7 @@ Deno.serve(async (req: Request) => {
         return json({ talking_photo_id: id });
       }
 
-      // 영상 생성 요청. ?talking_photo_id=..  본문: 멘트 mp3 (없으면 ?silence=초 → 대기 영상)
+      // 영상 생성 요청. ?talking_photo_id=..  본문: 멘트 음성(wav/mp3) (없으면 ?silence=초 → 대기 영상)
       if (path.startsWith("/heygen/video")) {
         const q = new URL(req.url).searchParams;
         const talkingPhotoId = q.get("talking_photo_id") ?? "";
@@ -169,7 +177,7 @@ Deno.serve(async (req: Request) => {
           if (audio.length > MAX_AUDIO_BYTES) return json({ error: "audio too large" }, 413);
           const up = await fetch(`${HG_UPLOAD}/asset`, {
             method: "POST",
-            headers: { "X-Api-Key": HEYGEN_KEY, "Content-Type": "audio/mpeg" },
+            headers: { "X-Api-Key": HEYGEN_KEY, "Content-Type": req.headers.get("content-type") ?? "audio/mpeg" },
             body: audio,
           });
           const uj = await readJson(up);

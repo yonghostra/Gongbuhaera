@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
 
+import '../config.dart';
 import '../data/lines.dart';
 import '../models/parent_profile.dart';
 import '../services/audio_service.dart';
@@ -23,7 +24,8 @@ import 'home_screen.dart';
 ///  2. 사진
 ///  3. 동의 + 목소리 녹음
 ///  4. 가상 부모 만들기
-///     목소리 복제(ElevenLabs) → 멘트 30개 → 사진 아바타 등록(HeyGen) → 말하는 영상 31개
+///     목소리 복제(ElevenLabs) → 멘트 30개 (1~2분)
+///     (HeyGen 을 켰을 때만: → 사진 아바타 등록 → 말하는 영상 31개)
 class SetupScreen extends StatefulWidget {
   /// 다시 만들 때 기존 정보 (완성 후 예전 목소리를 지운다).
   final ParentProfile? previous;
@@ -171,6 +173,15 @@ class _SetupScreenState extends State<SetupScreen> {
             audioPath: rec);
       }
       final voiceId = _voiceId!;
+      // 진행 정보 저장 (앱을 꺼도 이어서 만들 수 있게)
+      var profile = ParentProfile(
+        role: _role,
+        childCall: childCall,
+        photoPath: photo,
+        voiceId: voiceId,
+        talkingPhotoId: _talkingPhotoId,
+      );
+      await StorageService.saveProfile(profile);
 
       // 2) 멘트 30개
       setState(() => _stage = _Stage.lines);
@@ -184,27 +195,27 @@ class _SetupScreenState extends State<SetupScreen> {
         },
       );
 
-      // 3) 사진 아바타 등록 → 진행 정보 저장 (앱을 꺼도 이어서 만들 수 있게)
-      setState(() => _stage = _Stage.avatar);
-      _talkingPhotoId ??= await avatar.uploadPhoto(photo);
-      final profile = ParentProfile(
-        role: _role,
-        childCall: childCall,
-        photoPath: photo,
-        voiceId: voiceId,
-        talkingPhotoId: _talkingPhotoId,
-      );
-      await StorageService.saveProfile(profile);
-
-      // 4) 말하는 영상 31개
-      await AvatarLibrary.generateVideos(
-        service: avatar,
-        voiceId: voiceId,
-        talkingPhotoId: _talkingPhotoId!,
-        onProgress: (d, _) {
-          if (mounted) setState(() => _videosDone = d);
-        },
-      );
+      // 3~4) HeyGen 을 켰을 때만: 사진 아바타 등록 → 말하는 영상 31개
+      if (Config.useVideoAvatar) {
+        setState(() => _stage = _Stage.avatar);
+        _talkingPhotoId ??= await avatar.uploadPhoto(photo);
+        profile = ParentProfile(
+          role: _role,
+          childCall: childCall,
+          photoPath: photo,
+          voiceId: voiceId,
+          talkingPhotoId: _talkingPhotoId,
+        );
+        await StorageService.saveProfile(profile);
+        await AvatarLibrary.generateVideos(
+          service: avatar,
+          voiceId: voiceId,
+          talkingPhotoId: _talkingPhotoId!,
+          onProgress: (d, _) {
+            if (mounted) setState(() => _videosDone = d);
+          },
+        );
+      }
 
       // 다시 만든 경우 예전 것 정리
       final prev = widget.previous;
@@ -225,7 +236,7 @@ class _SetupScreenState extends State<SetupScreen> {
       setState(() => _preview = ctrl);
       await ctrl.init(await lib.idleVideo());
       final hello = await lib.pick(LineKind.start, childCall: childCall, role: _role);
-      await ctrl.say(hello.video, hello.text);
+      await ctrl.say(video: hello.video, audio: hello.audio, text: hello.text);
     } catch (e) {
       if (!mounted) return;
       setState(() => _error = e.toString());
@@ -458,9 +469,13 @@ class _SetupScreenState extends State<SetupScreen> {
                   child: Padding(
                     padding: const EdgeInsets.only(top: 12),
                     child: Text(
-                      '녹음하는 사람은 본인($_role)이며, 가상 부모를 만들기 위해 '
-                      '내 목소리 녹음과 사진이 음성·영상 AI 서비스(ElevenLabs, HeyGen)로 '
-                      '전송되는 것에 동의합니다.',
+                      Config.useVideoAvatar
+                          ? '녹음하는 사람은 본인($_role)이며, 가상 부모를 만들기 위해 '
+                              '내 목소리 녹음과 사진이 음성·영상 AI 서비스(ElevenLabs, HeyGen)로 '
+                              '전송되는 것에 동의합니다.'
+                          : '녹음하는 사람은 본인($_role)이며, 목소리 복제를 위해 '
+                              '내 목소리 녹음이 음성 AI 서비스(ElevenLabs)로 전송되는 것에 동의합니다. '
+                              '사진은 폰 밖으로 나가지 않아요.',
                       style: AppText.base(13, c: AppColors.inkSub, height: 1.5),
                     ),
                   ),
@@ -557,8 +572,10 @@ class _SetupScreenState extends State<SetupScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         ScreenTitle(
-            title: _working ? '$_role 아바타를\n만들고 있어요' : '가상 $_role를\n만들어요',
-            sub: '10~15분 정도 걸려요. 화면을 켜 둔 채로 기다려 주세요. 중간에 꺼져도 다시 열면 이어서 만들어요.'),
+            title: _working ? '가상 $_role를\n만들고 있어요' : '가상 $_role를\n만들어요',
+            sub: Config.useVideoAvatar
+                ? '10~15분 정도 걸려요. 화면을 켜 둔 채로 기다려 주세요. 중간에 꺼져도 다시 열면 이어서 만들어요.'
+                : '1~2분 정도 걸려요. 화면을 켜 둔 채로 기다려 주세요. 중간에 꺼져도 다시 열면 이어서 만들어요.'),
         const SizedBox(height: 24),
         Center(
           child: AvatarView(
@@ -577,12 +594,14 @@ class _SetupScreenState extends State<SetupScreen> {
             active: _stage == _Stage.lines,
             count: '$_linesDone / $linesTotal',
             progress: _linesDone / linesTotal),
-        const SizedBox(height: 8),
-        _task('말하는 아바타 영상',
-            done: false,
-            active: _stage == _Stage.avatar,
-            count: '$_videosDone / $total',
-            progress: _videosDone / total),
+        if (Config.useVideoAvatar) ...[
+          const SizedBox(height: 8),
+          _task('말하는 아바타 영상',
+              done: false,
+              active: _stage == _Stage.avatar,
+              count: '$_videosDone / $total',
+              progress: _videosDone / total),
+        ],
         if (_error != null) ...[
           const SizedBox(height: 16),
           Container(

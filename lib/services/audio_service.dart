@@ -35,9 +35,8 @@ class AudioService {
   final AudioPlayer _player = AudioPlayer();
   bool _applied = false;
 
-  /// 지금 말하는 중인지 (부모 사진 테두리 애니메이션용).
-  Stream<bool> get speaking =>
-      _player.onPlayerStateChanged.map((s) => s == PlayerState.playing);
+  /// 재생이 끝났을 때.
+  Stream<void> get completed => _player.onPlayerComplete;
 
   Future<void> _ensureCtx() async {
     if (_applied) return;

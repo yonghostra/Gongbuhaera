@@ -35,7 +35,8 @@ class VoiceService {
     return id;
   }
 
-  /// 문장 하나를 복제 목소리로 읽은 mp3.
+  /// 문장 하나를 복제 목소리로 읽은 PCM(24kHz 16bit 모노 원음).
+  /// WAV 로 감싸는 건 audio_utils.pcmToWav.
   Future<Uint8List> tts(String voiceId, String text) async {
     _checkConfig();
     final res = await http
@@ -44,7 +45,8 @@ class VoiceService {
               ...Config.authHeaders,
               'Content-Type': 'application/json'
             },
-            body: jsonEncode({'voice_id': voiceId, 'text': text}))
+            body: jsonEncode(
+                {'voice_id': voiceId, 'text': text, 'format': 'pcm_24000'}))
         .timeout(const Duration(seconds: 60));
     if (res.statusCode != 200) throw VoiceException(_errorText(res));
     return res.bodyBytes;

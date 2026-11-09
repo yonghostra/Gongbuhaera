@@ -21,7 +21,7 @@ class AvatarVideoStatus {
 /// HeyGen 사진 아바타로 "말하는 영상"을 만드는 클라이언트 (프록시 경유).
 ///
 /// 흐름: 사진 업로드 → talking_photo_id
-///      → (멘트 mp3 마다) 영상 생성 요청 → video_id
+///      → (멘트 음성마다) 영상 생성 요청 → video_id
 ///      → 상태 확인 → 완료되면 video_url 에서 mp4 다운로드
 class AvatarService {
   /// 부모 사진을 HeyGen 사진 아바타로 등록.
@@ -40,7 +40,7 @@ class AvatarService {
     return id;
   }
 
-  /// 말하는 영상 생성 요청. [audioPath] 가 없으면 [silenceSeconds] 동안 말없이 있는 대기 영상.
+  /// 말하는 영상 생성 요청 ([audioPath] 는 wav). 없으면 [silenceSeconds] 동안 말없이 있는 대기 영상.
   Future<String> createVideo({
     required String talkingPhotoId,
     String? audioPath,
@@ -56,7 +56,7 @@ class AvatarService {
             headers: {
               ...Config.authHeaders,
               'Content-Type':
-                  audioPath == null ? 'application/octet-stream' : 'audio/mpeg',
+                  audioPath == null ? 'application/octet-stream' : 'audio/wav',
             },
             body: audioPath == null
                 ? <int>[]

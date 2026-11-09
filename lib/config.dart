@@ -19,6 +19,11 @@ class Config {
   static String get heygenVideoUrl => '$proxyUrl/heygen/video';
   static String get heygenStatusUrl => '$proxyUrl/heygen/status';
 
+  /// HeyGen 말하는 영상 아바타 사용 여부 (보류 중 → 기본 꺼짐).
+  /// 켜려면 빌드 시 --dart-define=USE_HEYGEN=true
+  /// 꺼져 있으면 부모 사진 + 복제 목소리로 "말하는 연출"을 한다.
+  static const useVideoAvatar = bool.fromEnvironment('USE_HEYGEN');
+
   static Map<String, String> get authHeaders => {'x-app-secret': appSecret};
 
   static bool get hasProxy => proxyUrl.isNotEmpty && appSecret.isNotEmpty;
